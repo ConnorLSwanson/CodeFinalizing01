@@ -9,6 +9,10 @@ ENetHost* NetHost = nullptr;
 ENetPeer* Peer = nullptr;
 bool IsServer = false;
 thread* PacketThread = nullptr;
+thread* ServerInputThread = nullptr;
+thread* ClientInputThread = nullptr;
+string ServerInput = nullptr;
+string ClientInput = nullptr;
 
 enum PacketHeaderTypes
 {
@@ -21,6 +25,7 @@ enum PacketHeaderTypes
 struct GamePacket
 {
     GamePacket() {}
+    // Make private?
     PacketHeaderTypes Type = PHT_Invalid;
 };
 
@@ -101,6 +106,8 @@ void HandleReceivePacket(const ENetEvent& event)
                 cout << response << endl;
             }
         }
+
+        // TODO: add packet types for displaying chat messages
     }
     else
     {
@@ -134,9 +141,11 @@ void BroadcastIsDeadPacket()
 
 void ServerProcessPackets()
 {
-    while (1)
+    // TODO: Change while loop to end based on server input.
+    while (ClientInput != "quit")
     {
         ENetEvent event;
+        // TODO: start thread to get server input (awaits disconnect)
         while (enet_host_service(NetHost, &event, 1000) > 0)
         {
             switch (event.type)
@@ -148,7 +157,9 @@ void ServerProcessPackets()
                     << endl;
                 /* Store any relevant client information here. */
                 event.peer->data = (void*)("Client information");
-                BroadcastIsDeadPacket();
+                // TODO: send welcome message to number guessing game.
+
+                //BroadcastIsDeadPacket();
                 break;
             case ENET_EVENT_TYPE_RECEIVE:
                 HandleReceivePacket(event);
@@ -166,9 +177,18 @@ void ServerProcessPackets()
 
 void ClientProcessPackets()
 {
+    // TODO: Change while loop to end based on user input
     while (1)
     {
         ENetEvent event;
+
+        // TODO: start thread to get client input (for gaem)
+        /* if (ClientInputThread == nullptr)
+        *  {
+        *       ClientInputThread = new thread(function to get input)
+        *  }
+        */
+
         /* Wait up to 1000 milliseconds for an event. */
         while (enet_host_service(NetHost, &event, 1000) > 0)
         {
@@ -184,6 +204,8 @@ void ClientProcessPackets()
         }
     }
 }
+
+// TODO: create function that will be threaded and get input from either user
 
 int main(int argc, char** argv)
 {
@@ -209,6 +231,8 @@ int main(int argc, char** argv)
                 "An error occurred while trying to create an ENet server.\n");
             exit(EXIT_FAILURE);
         }
+
+        // TODO: start up random number for guessing game.
 
         IsServer = true;
         cout << "waiting for players to join..." << endl;
