@@ -2,6 +2,7 @@
 #include <string>
 #include <iostream>
 #include <thread>
+#include <random>
 
 using namespace std;
 
@@ -9,17 +10,18 @@ ENetHost* NetHost = nullptr;
 ENetPeer* Peer = nullptr;
 bool IsServer = false;
 thread* PacketThread = nullptr;
-thread* ServerInputThread = nullptr;
-thread* ClientInputThread = nullptr;
+thread* InputThread = nullptr;
 string ServerInput = nullptr;
 string ClientInput = nullptr;
+string WelcomeToTheGameStr = "Welcome to the number guessing game! \nGuess a number between 1 and 100!\n";
 
 enum PacketHeaderTypes
 {
     PHT_Invalid = 0,
     PHT_IsDead,
     PHT_Position,
-    PHT_Count
+    PHT_Count,
+    PHT_Chat
 };
 
 struct GamePacket
@@ -50,6 +52,17 @@ struct PositionPacket : public GamePacket
     int playerId = 0;
     int x = 0;
     int y = 0;
+};
+
+// DONE: create struct for ChatPacket that inherits GamePacket
+struct ChatPacket : public GamePacket
+{
+    ChatPacket()
+    {
+        Type = PHT_Chat;
+    }
+
+    string message = nullptr;
 };
 
 //can pass in a peer connection if wanting to limit
@@ -105,9 +118,16 @@ void HandleReceivePacket(const ENetEvent& event)
                 string response = (DeadGamePacket->IsDead ? "yeah" : "no");
                 cout << response << endl;
             }
+        }// TODO: add packet types for displaying chat messages
+        else if (RecGamePacket->Type == PHT_Chat)
+        {
+            ChatPacket* chatPacket = (ChatPacket*)(event.packet->data);
+            if (chatPacket)
+            {
+                string msg = chatPacket->message;
+                cout << "User Response: " << msg << endl;
+            }
         }
-
-        // TODO: add packet types for displaying chat messages
     }
     else
     {
@@ -139,13 +159,33 @@ void BroadcastIsDeadPacket()
     delete DeadPacket;
 }
 
+// DONE: create broadcastNumberGuessingPacket()
+void BroadcastNumberGuessingIntroPacket()
+{
+    ChatPacket* chatPacket = new ChatPacket();
+    chatPacket->message = WelcomeToTheGameStr;
+    ENetPacket* packet = enet_packet_create(chatPacket,
+        sizeof(ChatPacket),
+        ENET_PACKET_FLAG_RELIABLE);
+
+    enet_host_broadcast(NetHost, 0, packet);
+
+    enet_host_flush(NetHost);
+}
+
 void ServerProcessPackets()
 {
-    // TODO: Change while loop to end based on server input.
-    while (ClientInput != "quit")
+    // DONE: Change while loop to end based on server input.
+    while (ServerInput != "quit")
     {
         ENetEvent event;
-        // TODO: start thread to get server input (awaits disconnect)
+        // DONE: start thread to get server input (awaits disconnect)
+        if (InputThread == nullptr)
+        {
+            // TODO: thread is causing build error. "error C2065: 'GetInput': undeclared identifier"
+            InputThread = new thread(GetInput);
+        }
+
         while (enet_host_service(NetHost, &event, 1000) > 0)
         {
             switch (event.type)
@@ -157,7 +197,8 @@ void ServerProcessPackets()
                     << endl;
                 /* Store any relevant client information here. */
                 event.peer->data = (void*)("Client information");
-                // TODO: send welcome message to number guessing game.
+                // DONE: send welcome message to number guessing game.
+                BroadcastNumberGuessingIntroPacket();
 
                 //BroadcastIsDeadPacket();
                 break;
@@ -177,17 +218,18 @@ void ServerProcessPackets()
 
 void ClientProcessPackets()
 {
-    // TODO: Change while loop to end based on user input
-    while (1)
+    // DONE: Change while loop to end based on user input
+    while (ClientInput != "quit")
     {
         ENetEvent event;
 
-        // TODO: start thread to get client input (for gaem)
-        /* if (ClientInputThread == nullptr)
-        *  {
-        *       ClientInputThread = new thread(function to get input)
-        *  }
-        */
+        // DONE: start thread to get client input (for gaem)
+         if (InputThread == nullptr)
+         {
+             // TODO: thread is causing build error. "error C2065: 'GetInput': undeclared identifier"
+             InputThread = new thread(GetInput);
+         }
+        
 
         /* Wait up to 1000 milliseconds for an event. */
         while (enet_host_service(NetHost, &event, 1000) > 0)
@@ -205,7 +247,20 @@ void ClientProcessPackets()
     }
 }
 
-// TODO: create function that will be threaded and get input from either user
+// DONE: create function that will be threaded and get input from either user
+void GetInput()
+{
+    if (IsServer)
+    {
+        // update serverInput variable
+        cin >> ServerInput;
+    }
+    else 
+    {
+        // update clientInput variable
+        cin >> ClientInput;
+    }
+}
 
 int main(int argc, char** argv)
 {
@@ -216,6 +271,9 @@ int main(int argc, char** argv)
         return EXIT_FAILURE;
     }
     atexit(enet_deinitialize);
+
+    srand((unsigned)time(0));
+    int rng = 0;
 
     cout << "1) Create Server " << endl;
     cout << "2) Create Client " << endl;
@@ -232,7 +290,8 @@ int main(int argc, char** argv)
             exit(EXIT_FAILURE);
         }
 
-        // TODO: start up random number for guessing game.
+        // DONE: start up random number for guessing game.
+        rng = rand() & 100;
 
         IsServer = true;
         cout << "waiting for players to join..." << endl;
